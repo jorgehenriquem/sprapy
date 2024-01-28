@@ -16,7 +16,7 @@ function formatConsoleDate(date) {
 function consoleLogWithStyle(message, colorCode = 37) {
   console.log(
     `\x1b[${colorCode}m%s\x1b[0m`,
-    `${formatConsoleDate(new Date())} ${message}`,
+    `${formatConsoleDate(new Date())} ${message}`
   );
 }
 
@@ -38,7 +38,7 @@ async function randomScroll(page) {
 
         elemento.scrollTo(0, currentPosition);
         await new Promise((resolve) =>
-          setTimeout(resolve, randomBetween(200, 500)),
+          setTimeout(resolve, randomBetween(200, 500))
         ); // Tempo de espera reduzido
       }
     }
@@ -86,7 +86,7 @@ async function findWordsInPage(page, words) {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 800 });
   await page.setUserAgent(
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36"
   );
   await page.goto("https://tinder.com/app/recs", { waitUntil: "load" });
 
@@ -95,12 +95,12 @@ async function findWordsInPage(page, words) {
 
   while (true) {
     consoleLogWithStyle(
-      `Likes: ${contadorLikes}, Deslikes: ${contadorDeslikes}`,
+      `Likes: ${contadorLikes}, Deslikes: ${contadorDeslikes}`
     );
     await sleep(1000);
     let selectorVisible = await isSelectorVisible(
       page,
-      "span.Typs\\(display-1-strong\\)",
+      "span.Typs\\(display-1-strong\\)"
     );
 
     await page.evaluate(() => {
@@ -118,7 +118,7 @@ async function findWordsInPage(page, words) {
       await sleep(1000);
       await page.evaluate(() => {
         const buttons = Array.from(
-          document.querySelectorAll("button[type='button']"),
+          document.querySelectorAll("button[type='button']")
         );
         const targetButton = buttons.find((button) => {
           const hiddenSpan = button.querySelector("span.Hidden");
@@ -130,15 +130,13 @@ async function findWordsInPage(page, words) {
       });
       await page.waitForFunction(() =>
         Array.from(document.querySelectorAll('button[type="button"]')).some(
-          (button) => button.textContent.includes("Denunciar"),
-        ),
+          (button) => button.textContent.includes("Denunciar")
+        )
       );
 
       await randomScroll(page);
 
-      const blackList = await findWordsInPage(page, [
-
-      ]);
+      const blackList = await findWordsInPage(page, []);
       if (!blackList) {
         await clickAction(page, "Curti");
         consoleLogWithStyle("Like clicado", "32");
@@ -153,7 +151,7 @@ async function findWordsInPage(page, words) {
     } else {
       consoleLogWithStyle(
         "Seletor ainda não encontrado. Continuando o loop...",
-        "31",
+        "31"
       );
       continue; // Pula para a próxima iteração do loop
     }
