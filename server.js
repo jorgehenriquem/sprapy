@@ -1,9 +1,22 @@
+require("dotenv").config();
+
 const puppeteer = require("puppeteer");
 
+/**
+ * Waits for the given number of milliseconds.
+ * @param {number} ms - Number of milliseconds to wait.
+ */
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Formats the given Date object into a string representation.
+ * The format used is [hour:minutes:seconds.milliseconds].
+ *
+ * @param {Date} date - The Date object to be formatted.
+ * @returns {string} A string representing the formatted date.
+ */
 function formatConsoleDate(date) {
   const hour = date.getHours();
   const minutes = date.getMinutes();
@@ -13,6 +26,13 @@ function formatConsoleDate(date) {
   return `[${hour}:${minutes}:${seconds}.${milliseconds}]`;
 }
 
+/**
+ * Logs a message to the console with a specific color and a timestamp.
+ * The timestamp is generated using the `formatConsoleDate` function.
+ *
+ * @param {string} message - The message to be logged.
+ * @param {number} [colorCode=37] - The ANSI color code for the text color. Default is 37 (white).
+ */
 function consoleLogWithStyle(message, colorCode = 37) {
   console.log(
     `\x1b[${colorCode}m%s\x1b[0m`,
@@ -20,6 +40,10 @@ function consoleLogWithStyle(message, colorCode = 37) {
   );
 }
 
+/**
+ * Performs a random scroll on the specified page.
+ * @param {object} page - Puppeteer page object.
+ */
 async function randomScroll(page) {
   await page.evaluate(async () => {
     const randomBetween = (min, max) =>
@@ -45,6 +69,11 @@ async function randomScroll(page) {
   });
 }
 
+/**
+ * Clicks a specified action button on the page.
+ * @param {object} page - Puppeteer page object.
+ * @param {string} action - The action to perform (e.g., 'Curti', 'Não').
+ */
 async function clickAction(page, action) {
   const delay = Math.random() * 3000 + 2000;
   await sleep(delay);
@@ -61,6 +90,11 @@ async function clickAction(page, action) {
   }, action);
 }
 
+/**
+ * Finds if any of the specified words exist on the page.
+ * @param {object} page - Puppeteer page object.
+ * @param {string[]} words - Array of words to find.
+ */
 async function findWordsInPage(page, words) {
   const result = await page.evaluate((words) => {
     const text = document.body.innerText || "";
@@ -68,6 +102,42 @@ async function findWordsInPage(page, words) {
   }, words);
 
   return result;
+}
+
+/**
+ * Rejects the super like prompt if visible.
+ * @param {object} page - Puppeteer page object.
+ */
+async function rejectSuperLike(page) {
+  await page.evaluate(() => {
+    const buttons = Array.from(document.querySelectorAll("button.c1p6lbu0"));
+    const targetButton = buttons.find((button) => {
+      const buttonText = button.innerText || button.textContent;
+      return buttonText.includes("Não, obrigado(a)");
+    });
+    if (targetButton) {
+      targetButton.click();
+    }
+  });
+}
+
+/**
+ * Opens the profile if the button is visible.
+ * @param {object} page - Puppeteer page object.
+ */
+async function openProfile(page) {
+  await page.evaluate(() => {
+    const buttons = Array.from(
+      document.querySelectorAll("button[type='button']")
+    );
+    const targetButton = buttons.find((button) => {
+      const hiddenSpan = button.querySelector("span.Hidden");
+      return hiddenSpan && hiddenSpan.textContent.includes("Abrir perfil");
+    });
+    if (targetButton) {
+      targetButton.click();
+    }
+  });
 }
 
 (async () => {
@@ -93,10 +163,36 @@ async function findWordsInPage(page, words) {
   let countLikes = 0;
   let countNopes = 0;
 
+  /**
+   * Updates the console message with the current counts of 'Likes' and 'Nopes'.
+   * The message is updated on the same line for better visibility.
+   *
+   * @param {number} countLikes - The current count of 'Likes'.
+   * @param {number} countNopes - The current count of 'Nopes'.
+   */
   function reloadMessageConsole() {
     const likeMessage = `Working -- Likes: \x1b[32m${countLikes}\x1b[0m`;
     const deslikeMessage = `, Nope: \x1b[31m${countNopes}\x1b[0m`;
     process.stdout.write(`\r\x1b[37m${likeMessage}${deslikeMessage}`);
+  }
+
+  /**
+   * Decides whether to like or nope based on the blacklist words.
+   * @param {object} page - Puppeteer page object.
+   * @param {string[]} blackListWords - Array of blacklist words.
+   */
+  async function decideLikeOrNope(page, blackListWords) {
+    const blackList = await findWordsInPage(page, blackListWords);
+    if (!blackList) {
+      await clickAction(page, "Curti");
+      countLikes++;
+      reloadMessageConsole();
+    } else {
+      await clickAction(page, "Não");
+      countNopes++;
+      reloadMessageConsole();
+    }
+    await sleep(1000);
   }
 
   while (true) {
@@ -106,64 +202,34 @@ async function findWordsInPage(page, words) {
       "span.Typs\\(display-1-strong\\)"
     );
 
-    await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll("button.c1p6lbu0"));
-      const targetButton = buttons.find((button) => {
-        const buttonText = button.innerText || button.textContent;
-        return buttonText.includes("Não, obrigado(a)");
-      });
-      if (targetButton) {
-        targetButton.click();
-      }
-    });
+    await rejectSuperLike(page);
 
     if (selectorVisible) {
       await sleep(1000);
-      await page.evaluate(() => {
-        const buttons = Array.from(
-          document.querySelectorAll("button[type='button']")
-        );
-        const targetButton = buttons.find((button) => {
-          const hiddenSpan = button.querySelector("span.Hidden");
-          return hiddenSpan && hiddenSpan.textContent.includes("Abrir perfil");
-        });
-        if (targetButton) {
-          targetButton.click();
-        }
-      });
+      await openProfile(page);
       await page.waitForFunction(() =>
         Array.from(document.querySelectorAll('button[type="button"]')).some(
           (button) => button.textContent.includes("Denunciar")
         )
       );
-
       await randomScroll(page);
-
-      const blackList = await findWordsInPage(page, []);
-      if (!blackList) {
-        await clickAction(page, "Curti");
-        countLikes++;
-        reloadMessageConsole();
-        await sleep(1000);
-      } else {
-        await clickAction(page, "Não");
-        countNopes++;
-        reloadMessageConsole();
-        await sleep(1000);
-      }
+      await decideLikeOrNope(page, process.env.BLACKLIST_WORDS.split(","));
     } else {
-      consoleLogWithStyle(
-        "Seletor ainda não encontrado. Continuando o loop...",
-        "31"
-      );
-      continue; // Pula para a próxima iteração do loop
+      consoleLogWithStyle("erro de execução. tentando novamente...", "31");
     }
   }
 
+  /**
+   * Checks if a specific selector is visible on the page within a given timeout.
+   *
+   * @param {object} page - The Puppeteer page instance.
+   * @param {string} selector - The CSS selector to check for visibility.
+   * @returns {Promise<boolean>} - A promise that resolves to 'true' if the selector is visible, 'false' otherwise.
+   */
   async function isSelectorVisible(page, selector) {
     return page
       .waitForSelector(selector, { visible: true, timeout: 5000 })
-      .then(() => true) // Seletor encontrado e visível
-      .catch(() => false); // Falha ao encontrar o seletor
+      .then(() => true)
+      .catch(() => false);
   }
 })();
