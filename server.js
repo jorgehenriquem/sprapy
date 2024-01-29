@@ -90,13 +90,16 @@ async function findWordsInPage(page, words) {
   );
   await page.goto("https://tinder.com/app/recs", { waitUntil: "load" });
 
-  let contadorLikes = 0;
-  let contadorDeslikes = 0;
+  let countLikes = 0;
+  let countNopes = 0;
+
+  function reloadMessageConsole() {
+    const likeMessage = `Working -- Likes: \x1b[32m${countLikes}\x1b[0m`;
+    const deslikeMessage = `, Nope: \x1b[31m${countNopes}\x1b[0m`;
+    process.stdout.write(`\r\x1b[37m${likeMessage}${deslikeMessage}`);
+  }
 
   while (true) {
-    consoleLogWithStyle(
-      `Likes: ${contadorLikes}, Deslikes: ${contadorDeslikes}`
-    );
     await sleep(1000);
     let selectorVisible = await isSelectorVisible(
       page,
@@ -139,13 +142,13 @@ async function findWordsInPage(page, words) {
       const blackList = await findWordsInPage(page, []);
       if (!blackList) {
         await clickAction(page, "Curti");
-        consoleLogWithStyle("Like clicado", "32");
-        contadorLikes++;
+        countLikes++;
+        reloadMessageConsole();
         await sleep(1000);
       } else {
         await clickAction(page, "Não");
-        consoleLogWithStyle("Deslike clicado", "31");
-        contadorDeslikes++;
+        countNopes++;
+        reloadMessageConsole();
         await sleep(1000);
       }
     } else {
