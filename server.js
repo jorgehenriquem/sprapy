@@ -154,7 +154,7 @@ async function openProfile(page) {
     userDataDir: "/home/jorge/puppeteer_data", //@todo colocar em .env
   });
   const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
+  await page.setViewport({ width: 1920, height: 1080 });
   await page.setUserAgent(
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36"
   );
@@ -162,6 +162,7 @@ async function openProfile(page) {
 
   let countLikes = 0;
   let countNopes = 0;
+  let countNopesRadons = 0;
 
   /**
    * Updates the console message with the current counts of 'Likes' and 'Nopes'.
@@ -169,11 +170,15 @@ async function openProfile(page) {
    *
    * @param {number} countLikes - The current count of 'Likes'.
    * @param {number} countNopes - The current count of 'Nopes'.
+   * @param {number} countNopesRadons - The current count of 'Nopes' in randon function.
    */
   function reloadMessageConsole() {
     const likeMessage = `Working -- Likes: \x1b[32m${countLikes}\x1b[0m`;
     const deslikeMessage = `, Nope: \x1b[31m${countNopes}\x1b[0m`;
-    process.stdout.write(`\r\x1b[37m${likeMessage}${deslikeMessage}`);
+    const deslikeMessageRadon = `, NopeRandons: \x1b[33m${countNopesRadons}\x1b[0m`;
+    process.stdout.write(
+      `\r\x1b[37m${likeMessage}${deslikeMessage}${deslikeMessageRadon}`
+    );
   }
 
   /**
@@ -183,15 +188,23 @@ async function openProfile(page) {
    */
   async function decideLikeOrNope(page, blackListWords) {
     const blackList = await findWordsInPage(page, blackListWords);
-    if (!blackList) {
-      await clickAction(page, "Curti");
-      countLikes++;
-      reloadMessageConsole();
-    } else {
+
+    const randomDecision = Math.random() < 0.9 ? "Curti" : "Não";
+
+    if (blackList) {
       await clickAction(page, "Não");
       countNopes++;
       reloadMessageConsole();
+    } else {
+      await clickAction(page, randomDecision);
+      if (randomDecision === "Curti") {
+        countLikes++;
+      } else {
+        countNopesRadons++;
+      }
+      reloadMessageConsole();
     }
+
     await sleep(1000);
   }
 
