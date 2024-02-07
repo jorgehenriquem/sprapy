@@ -151,7 +151,7 @@ async function openProfile(page) {
       "--use-fake-device-for-media-stream",
     ],
     headless: false,
-    userDataDir: "/home/jorge/puppeteer_data", //@todo colocar em .env
+    userDataDir: "/home/jorge/puppeteer_data",
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 });
