@@ -105,6 +105,34 @@ async function findWordsInPage(page, words) {
 }
 
 /**
+Finds if any <div> element within a specific type of container contains a single word starting with "@".
+@param {object} page - Puppeteer page object.
+@returns {boolean} - True if exactly one <div> element contains a single word starting with "@"; otherwise, false.
+*/
+async function singleInstaBioVerification(page) {
+  const result = await page.evaluate(() => {
+    const elements = document.querySelectorAll(
+      "div[class*='Px(16px)'][class*='Py(12px)'][class*='Us(t)'] > div"
+    );
+
+    let wordCount = 0;
+    let wordStartingWithAt = false;
+
+    for (const element of elements) {
+      const words = element.textContent.trim().split(/\s+/);
+      if (words.length === 1 && words[0].startsWith("@")) {
+        wordCount++;
+        wordStartingWithAt = true;
+      }
+    }
+
+    return wordCount === 1 && wordStartingWithAt;
+  });
+
+  return result;
+}
+
+/**
  * Rejects the super like prompt if visible.
  * @param {object} page - Puppeteer page object.
  */
@@ -163,6 +191,7 @@ async function openProfile(page) {
   let countLikes = 0;
   let countNopes = 0;
   let countNopesRadons = 0;
+  let countNopesInsta = 0;
 
   /**
    * Updates the console message with the current counts of 'Likes' and 'Nopes'.
@@ -171,13 +200,16 @@ async function openProfile(page) {
    * @param {number} countLikes - The current count of 'Likes'.
    * @param {number} countNopes - The current count of 'Nopes'.
    * @param {number} countNopesRadons - The current count of 'Nopes' in randon function.
+   * @param {number} countNopesInsta - The current count of 'Nopes' in only insta cases.
    */
   function reloadMessageConsole() {
     const likeMessage = `Working -- Likes: \x1b[32m${countLikes}\x1b[0m`;
     const deslikeMessage = `, Nope: \x1b[31m${countNopes}\x1b[0m`;
     const deslikeMessageRadon = `, NopeRandons: \x1b[33m${countNopesRadons}\x1b[0m`;
+    const deslikeMessageInstas = `, NopeInsta: \x1b[30m${countNopesInsta}\x1b[0m`;
+
     process.stdout.write(
-      `\r\x1b[37m${likeMessage}${deslikeMessage}${deslikeMessageRadon}`
+      `\r\x1b[37m${likeMessage}${deslikeMessage}${deslikeMessageRadon}${deslikeMessageInstas}`
     );
   }
 
@@ -188,12 +220,17 @@ async function openProfile(page) {
    */
   async function decideLikeOrNope(page, blackListWords) {
     const blackList = await findWordsInPage(page, blackListWords);
+    const bioOnlyInsta = await singleInstaBioVerification(page);
 
     const randomDecision = Math.random() < 0.9 ? "Curti" : "Não";
 
-    if (blackList) {
+    if (blackList || bioOnlyInsta) {
       await clickAction(page, "Não");
-      countNopes++;
+      if (!bioOnlyInsta) {
+        countNopes++;
+      } else {
+        countNopesInsta++;
+      }
       reloadMessageConsole();
     } else {
       await clickAction(page, randomDecision);
@@ -220,15 +257,28 @@ async function openProfile(page) {
     if (selectorVisible) {
       await sleep(1000);
       await openProfile(page);
-      await page.waitForFunction(() =>
-        Array.from(document.querySelectorAll('button[type="button"]')).some(
-          (button) => button.textContent.includes("Denunciar")
-        )
-      );
-      await randomScroll(page);
-      await decideLikeOrNope(page, process.env.BLACKLIST_WORDS.split(","));
+      try {
+        await page.waitForFunction(
+          () =>
+            Array.from(document.querySelectorAll('button[type="button"]')).some(
+              (button) => button.textContent.includes("Denunciar")
+            ),
+          { timeout: 20000 }
+        );
+        await randomScroll(page);
+        await decideLikeOrNope(page, process.env.BLACKLIST_WORDS.split(","));
+      } catch (error) {
+        consoleLogWithStyle(
+          "Erro de tempo limite ao esperar pela função:",
+          "31"
+        );
+
+        await page.reload();
+      }
     } else {
-      consoleLogWithStyle("erro de execução. tentando novamente...", "31");
+      consoleLogWithStyle("erro de execução. tentando novamente.......", "31");
+      await sleep(2000);
+      await page.reload();
     }
   }
 
