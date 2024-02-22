@@ -55,15 +55,14 @@ async function randomScroll(page) {
       let currentPosition = 0;
 
       for (let i = 0; i < 5; i++) {
-        // Reduzido para 5 iterações
-        const distance = randomBetween(-500, 500); // Maior distância de rolagem
+        const distance = randomBetween(-500, 500);
         currentPosition += distance;
         currentPosition = Math.min(Math.max(currentPosition, 0), totalHeight);
 
         elemento.scrollTo(0, currentPosition);
         await new Promise((resolve) =>
           setTimeout(resolve, randomBetween(200, 500))
-        ); // Tempo de espera reduzido
+        );
       }
     }
   });
@@ -83,10 +82,10 @@ async function clickAction(page, action) {
       const hiddenSpan = button.querySelector("span.Hidden");
       if (hiddenSpan && hiddenSpan.textContent.trim() === action) {
         button.click();
-        return true; // Indica que o botão foi clicado
+        return true;
       }
     }
-    return false; // Indica que o botão não foi encontrado
+    return false;
   }, action);
 }
 
@@ -173,8 +172,8 @@ async function openProfile(page) {
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
-      "--disable-infobars", // Tenta ocultar a barra de informações
-      "--start-maximized", // Inicia com a janela maximizada
+      "--disable-infobars",
+      "--start-maximized",
       "--use-fake-ui-for-media-stream",
       "--use-fake-device-for-media-stream",
     ],
