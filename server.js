@@ -36,7 +36,7 @@ function formatConsoleDate(date) {
 function consoleLogWithStyle(message, colorCode = 37) {
   console.log(
     `\x1b[${colorCode}m%s\x1b[0m`,
-    `${formatConsoleDate(new Date())} ${message}`
+    `${formatConsoleDate(new Date())} ${message}`,
   );
 }
 
@@ -64,7 +64,7 @@ async function rejectSuperLike(page) {
 async function openProfile(page) {
   await page.evaluate(() => {
     const buttons = Array.from(
-      document.querySelectorAll("button[type='button']")
+      document.querySelectorAll("button[type='button']"),
     );
     const targetButton = buttons.find((button) => {
       const hiddenSpan = button.querySelector("span.Hidden");
@@ -97,7 +97,7 @@ async function randomScroll(page) {
 
         elemento.scrollTo(0, currentPosition);
         await new Promise((resolve) =>
-          setTimeout(resolve, randomBetween(200, 500))
+          setTimeout(resolve, randomBetween(200, 500)),
         );
       }
     }
@@ -172,7 +172,7 @@ async function findWordsInPage(page, words) {
 async function singleInstaBioVerification(page) {
   const result = await page.evaluate(() => {
     const elements = document.querySelectorAll(
-      "div[class*='Px(16px)'][class*='Py(12px)'][class*='Us(t)'] > div"
+      "div[class*='Px(16px)'][class*='Py(12px)'][class*='Us(t)'] > div",
     );
 
     let wordCount = 0;
@@ -205,7 +205,7 @@ async function singleInstaBioVerification(page) {
 async function singleInstaBioVerificationBumble(page) {
   const result = await page.evaluate(() => {
     const elements = document.querySelectorAll(
-      "p.encounters-story-about__text"
+      "p.encounters-story-about__text",
     );
 
     let wordCount = 0;
@@ -351,7 +351,7 @@ function reloadMessageConsole(decision, isInsta, origin) {
   const deslikeMessageInstas = `, NopeInsta: \x1b[30m${countNopesInsta}\x1b[0m`;
 
   process.stdout.write(
-    `\r\x1b[37m${likeMessage}${deslikeMessage}${deslikeMessageRadon}${deslikeMessageInstas} ${likeMessageBumble}${deslikeMessageBumble}${deslikeMessageRadonBumble}${deslikeMessageInstasBumble}`
+    `\r\x1b[37m${likeMessage}${deslikeMessage}${deslikeMessageRadon}${deslikeMessageInstas} ${likeMessageBumble}${deslikeMessageBumble}${deslikeMessageRadonBumble}${deslikeMessageInstasBumble}`,
   );
 }
 
@@ -359,13 +359,13 @@ function reloadMessageConsole(decision, isInsta, origin) {
  * Manipulates each page independently
  * @param {object} page - Puppeteer page object
  */
-async function handlePage(page, site) {
+async function runTinderInteraction(page, site) {
   while (true) {
     await sleep(1000);
     if (site === "tinder") {
       let selectorVisible = await isSelectorVisible(
         page,
-        "span.Typs\\(display-1-strong\\)"
+        "span.Typs\\(display-1-strong\\)",
       );
       if (selectorVisible) {
         await sleep(1000);
@@ -374,16 +374,16 @@ async function handlePage(page, site) {
           await page.waitForFunction(
             () =>
               Array.from(
-                document.querySelectorAll('button[type="button"]')
+                document.querySelectorAll('button[type="button"]'),
               ).some((button) => button.textContent.includes("Denunciar")),
-            { timeout: 20000 }
+            { timeout: 20000 },
           );
           await randomScroll(page);
           await decideLikeOrNope(page, process.env.BLACKLIST_WORDS.split(","));
         } catch (error) {
           consoleLogWithStyle(
             "Erro de tempo limite ao esperar pela função:",
-            "31"
+            "31",
           );
 
           await page.reload();
@@ -391,7 +391,7 @@ async function handlePage(page, site) {
       } else {
         consoleLogWithStyle(
           "erro de execução. tentando novamente.......",
-          "31"
+          "31",
         );
         await sleep(2000);
       }
@@ -411,14 +411,14 @@ async function handlePage(page, site) {
  * @param {string} site - The site identifier ("bumble").
  * @returns {Promise<void>} A Promise that resolves when the interaction logic is stopped.
  */
-async function handlePageBumble(page, site) {
+async function runBumbleInteraction(page, site) {
   while (true) {
     await sleep(1000);
     if (site === "bumble") {
       await randomArrow(page);
       await decideLikeOrNopeBumble(
         page,
-        process.env.BLACKLIST_WORDS.split(",")
+        process.env.BLACKLIST_WORDS.split(","),
       );
     }
   }
@@ -438,6 +438,26 @@ async function isSelectorVisible(page, selector) {
     .catch(() => false);
 }
 
+/**
+ * Sets up and opens a new page in Puppeteer browser.
+ *
+ * This function creates a new page in the Puppeteer browser, sets up the viewport and user agent,
+ * and navigates to the specified URL.
+ *
+ * @param {object} browser - The Puppeteer browser object.
+ * @param {string} url - The URL to navigate the page to.
+ * @returns {Promise<object>} A Promise that resolves with the configured and opened page object.
+ */
+async function setupPage(browser, url) {
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1920, height: 1080 });
+  await page.setUserAgent(
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
+  );
+  await page.goto(url, { waitUntil: "load" });
+  return page;
+}
+
 (async () => {
   const browser = await puppeteer.launch({
     args: [
@@ -452,23 +472,11 @@ async function isSelectorVisible(page, selector) {
     userDataDir: "/home/jorge/puppeteer_data",
   });
 
-  const page1 = await browser.newPage();
-  const page2 = await browser.newPage();
-
-  await page1.setViewport({ width: 1920, height: 1080 });
-  await page1.setUserAgent(
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36"
-  );
-  await page1.goto("https://tinder.com/app/recs", { waitUntil: "load" });
-
-  await page2.setViewport({ width: 1920, height: 1080 });
-  await page2.setUserAgent(
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36"
-  );
-  await page2.goto("https://bumble.com/app", { waitUntil: "load" });
+  const tinderPage = await setupPage(browser, "https://tinder.com/app/recs");
+  const bumblePage = await setupPage(browser, "https://bumble.com/app");
 
   await Promise.all([
-    handlePageBumble(page2, "bumble"),
-    handlePage(page1, "tinder"),
+    runBumbleInteraction(bumblePage, "bumble"),
+    runTinderInteraction(tinderPage, "tinder"),
   ]);
 })();
