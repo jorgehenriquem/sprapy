@@ -18,11 +18,11 @@ const bumbleService = require("./services/bumbleService");
   });
 
   const tinderPage = await setupPage(browser, "https://tinder.com/app/recs");
-  const bumblePage = await setupPage(browser, "https://bumble.com/app");
+  // const bumblePage = await setupPage(browser, "https://bumble.com/app");
 
   await Promise.all([
     tinderService.runTinderInteraction(tinderPage),
-    bumbleService.runBumbleInteraction(bumblePage),
+    // bumbleService.runBumbleInteraction(bumblePage),
   ]);
 })();
 
