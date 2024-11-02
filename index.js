@@ -28,7 +28,7 @@ const bumbleService = require("./services/bumbleService");
 
 async function setupPage(browser, url) {
   const page = await browser.newPage();
-  await page.setViewport({ width: 1920, height: 1080 });
+  await page.setViewport({ width: 1600, height: 900 });
   await page.setUserAgent(
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36"
   );
