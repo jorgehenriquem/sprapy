@@ -57,7 +57,7 @@ async function runTinderInteraction(page) {
       const screenshotBuffer = await page.screenshot({ clip });
       fs.writeFileSync("TinderPic.png", screenshotBuffer);
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); //mudar
       const prompt = process.env.PROMPT;
       const image = {
         inlineData: {
