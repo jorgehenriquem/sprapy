@@ -18,21 +18,41 @@ async function runTinderInteraction(page) {
     try {
       await sleep(1000);
       await openProfile(page);
+      await sleep(1000);
       const blackList = await findWordsInPage(
         page,
         process.env.BLACKLIST_WORDS.split(",")
       );
-      const bioOnlyInsta = await singleInstaBioVerification(page);
-      if (blackList || bioOnlyInsta) {
-        await decideLikeOrNope(page, "Não", true);
+      if (blackList) {
+        const screenWidth = 1920;
+        const screenHeight = 1080;
+        const clip = {
+          x: screenWidth / 4,
+          y: 0,
+          width: screenWidth / 2,
+          height: screenHeight,
+        };
+        const screenshotBuffer = await page.screenshot({ clip });
+        const currentDate = new Date();
+        const timestamp = currentDate.toISOString().replace(/:/g, "-");
+        const fileName = `Nopes/Blacklist/BlacklistPic_${timestamp}.png`;
+
+        fs.writeFileSync(fileName, screenshotBuffer);
+        await decideLikeOrNope(page, "Não");
       }
-      const screenWidth = 1920;
-      const screenHeight = 1080;
-      const clip = {
-        x: screenWidth / 4,
-        y: 0,
-        width: screenWidth / 2,
+      const screenWidth = 1600;
+      const screenHeight = 900;
+      await page.setViewport({
+        width: screenWidth,
         height: screenHeight,
+        deviceScaleFactor: 4,
+      });
+
+      const clip = {
+        x: screenWidth / 2.5,
+        y: 2.5,
+        width: screenWidth / 3,
+        height: screenHeight / 1.5,
       };
       const screenshotBuffer = await page.screenshot({ clip });
       fs.writeFileSync("TinderPic.png", screenshotBuffer);
