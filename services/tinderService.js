@@ -70,7 +70,7 @@ async function runTinderInteraction(page) {
       const result = await model.generateContent([prompt, image]);
       const response = await result.response;
       const text = response.text();
-      console.log(text);
+      console.log("Resposta do gemini:" + text);
       try {
         await page.waitForFunction(
           () =>
