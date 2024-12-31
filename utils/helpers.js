@@ -12,12 +12,35 @@ function randomBetween(min, max) {
  * @param {string[]} words - Array of words to find.
  */
 async function findWordsInPage(page, words) {
-  const result = await page.evaluate((words) => {
+  const foundWord = await page.evaluate((words) => {
     const text = document.body.innerText || "";
-    return words.some((word) => new RegExp(word, "gi").test(text));
+    return words.find((word) => {
+      if (new RegExp(word, "gi").test(text)) {
+        return word;
+      }
+      return null;
+    });
   }, words);
 
-  return result;
+  if (foundWord) {
+    console.log("palavra encontrada: " + foundWord);
+  }
+
+  return !!foundWord;
+}
+
+async function findWordsInPages(page, words) {
+  await page.waitForTimeout(800); // Use page.waitForTimeout instead of sleep
+  const element = await page.evaluate(() => {
+    const bodyText = document.body.innerText;
+    return bodyText;
+  });
+
+  for (let i = 0; i < words.length; i++) {
+    if (element.includes(words[i])) {
+      return true;
+    }
+  }
 }
 
 async function clickActionKey(page, action) {
