@@ -1,4 +1,6 @@
 require("dotenv").config();
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+const fs = require("fs");
 
 const puppeteer = require("puppeteer");
 
@@ -36,7 +38,7 @@ function formatConsoleDate(date) {
 function consoleLogWithStyle(message, colorCode = 37) {
   console.log(
     `\x1b[${colorCode}m%s\x1b[0m`,
-    `${formatConsoleDate(new Date())} ${message}`,
+    `${formatConsoleDate(new Date())} ${message}`
   );
 }
 
@@ -64,7 +66,7 @@ async function rejectSuperLike(page) {
 async function openProfile(page) {
   await page.evaluate(() => {
     const buttons = Array.from(
-      document.querySelectorAll("button[type='button']"),
+      document.querySelectorAll("button[type='button']")
     );
     const targetButton = buttons.find((button) => {
       const hiddenSpan = button.querySelector("span.Hidden");
@@ -97,7 +99,7 @@ async function randomScroll(page) {
 
         elemento.scrollTo(0, currentPosition);
         await new Promise((resolve) =>
-          setTimeout(resolve, randomBetween(200, 500)),
+          setTimeout(resolve, randomBetween(200, 500))
         );
       }
     }
@@ -150,6 +152,14 @@ async function clickAction(page, action) {
   }, action);
 }
 
+async function clickActionKey(page, action) {
+  if (action === "Sim") {
+    await page.keyboard.press("ArrowRight");
+  } else {
+    await page.keyboard.press("ArrowLeft");
+  }
+}
+
 /**
  * Finds if any of the specified words exist on the page.
  * @param {object} page - Puppeteer page object.
@@ -172,7 +182,7 @@ async function findWordsInPage(page, words) {
 async function singleInstaBioVerification(page) {
   const result = await page.evaluate(() => {
     const elements = document.querySelectorAll(
-      "div[class*='Px(16px)'][class*='Py(12px)'][class*='Us(t)'] > div",
+      "div[class*='Px(16px)'][class*='Py(12px)'][class*='Us(t)'] > div"
     );
 
     let wordCount = 0;
@@ -205,7 +215,7 @@ async function singleInstaBioVerification(page) {
 async function singleInstaBioVerificationBumble(page) {
   const result = await page.evaluate(() => {
     const elements = document.querySelectorAll(
-      "p.encounters-story-about__text",
+      "p.encounters-story-about__text"
     );
 
     let wordCount = 0;
@@ -230,17 +240,12 @@ async function singleInstaBioVerificationBumble(page) {
  * @param {object} page - Puppeteer page object.
  * @param {string[]} blackListWords - Array of blacklist words.
  */
-async function decideLikeOrNope(page, blackListWords) {
-  const blackList = await findWordsInPage(page, blackListWords);
-  const bioOnlyInsta = await singleInstaBioVerification(page);
-
-  const randomDecision = Math.random() < 0.9 ? "Curti" : "Não";
-
-  if (blackList || bioOnlyInsta) {
-    await clickAction(page, "Não");
+async function decideLikeOrNope(page, decision, bioOnlyInsta = false) {
+  if (decision === "Não" || bioOnlyInsta) {
+    await clickActionKey(page, "Não");
     reloadMessageConsole("não", bioOnlyInsta, "tinder");
   } else {
-    await clickAction(page, randomDecision);
+    await clickActionKey(page, "Sim");
     reloadMessageConsole("sim", bioOnlyInsta, "tinder");
   }
 
@@ -252,28 +257,15 @@ async function decideLikeOrNope(page, blackListWords) {
  * @param {object} page - Puppeteer page object.
  * @param {string[]} blackListWords - Array of blacklist words.
  */
-async function decideLikeOrNopeBumble(page, blackListWords) {
-  const blackList = await findWordsInPage(page, blackListWords);
-  const bioOnlyInsta = await singleInstaBioVerificationBumble(page);
-
+async function decideLikeOrNopeBumble(page, decision, bioOnlyInsta = false) {
   const randomDecision = Math.random() < 0.9 ? "sim" : "nao";
   await sleep(1000);
 
-  if (blackList || bioOnlyInsta) {
+  if (decision === "Não" || bioOnlyInsta) {
     await clickActionBumble(page, "nao");
-    if (!bioOnlyInsta) {
-      countNopesBumble++;
-    } else {
-      countNopesInstaBumble++;
-    }
     reloadMessageConsole("nao", bioOnlyInsta, "bumble");
   } else {
     await clickActionBumble(page, randomDecision);
-    if (randomDecision === "sim") {
-      countLikesBumble++;
-    } else {
-      countNopesRadonsBumble++;
-    }
     reloadMessageConsole(randomDecision, bioOnlyInsta, "bumble");
   }
 
@@ -311,6 +303,9 @@ let countNopesBumble = 0;
 let countNopesRadonsBumble = 0;
 let countNopesInstaBumble = 0;
 
+let countNopesBlackListBumble = 0;
+let countNopesBlackListTinder = 0;
+
 /**
  * Updates the console message with the current counts of 'Likes' and 'Nopes'.
  * The message is updated on the same line for better visibility.
@@ -344,14 +339,16 @@ function reloadMessageConsole(decision, isInsta, origin) {
   const deslikeMessageBumble = `, Nope: \x1b[31m${countNopesBumble}\x1b[0m`;
   const deslikeMessageRadonBumble = `, NopeRandons: \x1b[33m${countNopesRadonsBumble}\x1b[0m`;
   const deslikeMessageInstasBumble = `, NopeInsta: \x1b[30m${countNopesInstaBumble}\x1b[0m`;
+  const deslikeBLBumble = `, NopeBLTB: \x1b[30m${countNopesBlackListBumble}\x1b[0m`;
 
   const likeMessage = `\x1b[1mTinder\x1b[0m - Likes: \x1b[32m${countLikes}\x1b[0m`;
   const deslikeMessage = `, Nope: \x1b[31m${countNopes}\x1b[0m`;
   const deslikeMessageRadon = `, NopeRandons: \x1b[33m${countNopesRadons}\x1b[0m`;
   const deslikeMessageInstas = `, NopeInsta: \x1b[30m${countNopesInsta}\x1b[0m`;
+  const deslikeBLTinder = `, NopeBLT: \x1b[30m${countNopesBlackListTinder}\x1b[0m`;
 
   process.stdout.write(
-    `\r\x1b[37m${likeMessage}${deslikeMessage}${deslikeMessageRadon}${deslikeMessageInstas} ${likeMessageBumble}${deslikeMessageBumble}${deslikeMessageRadonBumble}${deslikeMessageInstasBumble}`,
+    `\r\x1b[37m${likeMessage}${deslikeMessage}${deslikeMessageRadon}${deslikeMessageInstas}${deslikeBLTinder} ${likeMessageBumble}${deslikeMessageBumble}${deslikeMessageRadonBumble}${deslikeMessageInstasBumble}${deslikeBLBumble}`
   );
 }
 
@@ -365,35 +362,82 @@ async function runTinderInteraction(page, site) {
     if (site === "tinder") {
       let selectorVisible = await isSelectorVisible(
         page,
-        "span.Typs\\(display-1-strong\\)",
+        "span.Typs\\(display-1-strong\\)"
       );
-      if (selectorVisible) {
+      try {
         await sleep(1000);
         await openProfile(page);
+        const blackList = await findWordsInPage(
+          page,
+          process.env.BLACKLIST_WORDS.split(",")
+        );
+        const bioOnlyInsta = await singleInstaBioVerification(page);
+        if (blackList || bioOnlyInsta) {
+          await decideLikeOrNope(page, "Não", true);
+          countNopesBlackListTinder++;
+        }
+        const screenWidth = 1920;
+        const screenHeight = 1080;
+        const clip = {
+          x: screenWidth / 4, // Começa a captura a partir do quarto da largura da tela
+          y: 0, // Começa a captura do topo da tela
+          width: screenWidth / 2, // Metade da largura da tela
+          height: screenHeight, // Toda a altura da tela
+        };
+        const screenshotBuffer = await page.screenshot({ clip });
+        fs.writeFileSync("TinderPic.png", screenshotBuffer);
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" });
+        const prompt = process.env.PROMPT;
+        const image = {
+          inlineData: {
+            data: Buffer.from(fs.readFileSync("TinderPic.png")).toString(
+              "base64"
+            ),
+            mimeType: "image/png",
+          },
+        };
+        const result = await model.generateContent([prompt, image]);
+        const response = await result.response;
+        const text = response.text();
         try {
           await page.waitForFunction(
             () =>
               Array.from(
-                document.querySelectorAll('button[type="button"]'),
+                document.querySelectorAll('button[type="button"]')
               ).some((button) => button.textContent.includes("Denunciar")),
-            { timeout: 20000 },
+            { timeout: 20000 }
           );
-          await randomScroll(page);
-          await decideLikeOrNope(page, process.env.BLACKLIST_WORDS.split(","));
-        } catch (error) {
-          consoleLogWithStyle(
-            "Erro de tempo limite ao esperar pela função:",
-            "31",
-          );
+          if (text.includes("Sim") || text.includes("sim")) {
+            const screenWidth = 1920;
+            const screenHeight = 1080;
+            const clip = {
+              x: screenWidth / 4, // Começa a captura a partir do quarto da largura da tela
+              y: 0, // Começa a captura do topo da tela
+              width: screenWidth / 2, // Metade da largura da tela
+              height: screenHeight, // Toda a altura da tela
+            };
+            const screenshotBuffer = await page.screenshot({ clip });
+            const currentDate = new Date();
+            const timestamp = currentDate.toISOString().replace(/:/g, "-");
+            const fileName = `Nopes/Tinder/TinderPic_${timestamp}.png`;
 
-          await page.reload();
+            fs.writeFileSync(fileName, screenshotBuffer);
+            await decideLikeOrNope(page, "Não");
+          } else {
+            await randomScroll(page);
+            await decideLikeOrNope(page, "Sim");
+          }
+        } catch (error) {
+          consoleLogWithStyle(error.message, "31");
+          await decideLikeOrNope(page, "Sim");
+          consoleLogWithStyle("Sim Pelo erro", "31");
+          // await page.reload();
         }
-      } else {
-        consoleLogWithStyle(
-          "erro de execução. tentando novamente.......",
-          "31",
-        );
-        await sleep(2000);
+      } catch (error) {
+        consoleLogWithStyle(error.message, "31");
+        await decideLikeOrNope(page, "Sim");
+        consoleLogWithStyle("Sim Pelo erro 2", "31");
       }
     }
 
@@ -415,11 +459,63 @@ async function runBumbleInteraction(page, site) {
   while (true) {
     await sleep(1000);
     if (site === "bumble") {
-      await randomArrow(page);
-      await decideLikeOrNopeBumble(
+      const blackList = await findWordsInPage(
         page,
-        process.env.BLACKLIST_WORDS.split(","),
+        process.env.BLACKLIST_WORDS.split(",")
       );
+      const bioOnlyInsta = await singleInstaBioVerificationBumble(page);
+      if (blackList || bioOnlyInsta) {
+        await decideLikeOrNopeBumble(page, "Não", true);
+        countNopesBlackListBumble++;
+      }
+      const screenWidth = 1920;
+      const screenHeight = 1080;
+      const clip = {
+        x: screenWidth / 4, // Começa a captura a partir do quarto da largura da tela
+        y: 0, // Começa a captura do topo da tela
+        width: screenWidth / 2, // Metade da largura da tela
+        height: screenHeight, // Toda a altura da tela
+      };
+      const screenshotBuffer = await page.screenshot({ clip });
+      fs.writeFileSync("BumblePic.png", screenshotBuffer);
+      try {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" });
+        const prompt = process.env.PROMPT;
+        const image = {
+          inlineData: {
+            data: Buffer.from(fs.readFileSync("BumblePic.png")).toString(
+              "base64"
+            ),
+            mimeType: "image/png",
+          },
+        };
+        const result = await model.generateContent([prompt, image]);
+        const response = await result.response;
+        const text = response.text();
+        if (text.includes("Sim") || text.includes("sim")) {
+          const screenWidth = 1920;
+          const screenHeight = 1080;
+          const clip = {
+            x: screenWidth / 4, // Começa a captura a partir do quarto da largura da tela
+            y: 0, // Começa a captura do topo da tela
+            width: screenWidth / 2, // Metade da largura da tela
+            height: screenHeight, // Toda a altura da tela
+          };
+          const screenshotBuffer = await page.screenshot({ clip });
+          const currentDate = new Date();
+          const timestamp = currentDate.toISOString().replace(/:/g, "-");
+          const fileName = `Nopes/Bumble/BumblePic_${timestamp}.png`;
+
+          fs.writeFileSync(fileName, screenshotBuffer);
+          await decideLikeOrNopeBumble(page, "Não");
+        } else {
+          await randomArrow(page);
+          await decideLikeOrNopeBumble(page, "Sim");
+        }
+      } catch {
+        await decideLikeOrNopeBumble(page, "Sim");
+      }
     }
   }
 }
@@ -452,7 +548,7 @@ async function setupPage(browser, url) {
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 });
   await page.setUserAgent(
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36"
   );
   await page.goto(url, { waitUntil: "load" });
   return page;
@@ -476,7 +572,7 @@ async function setupPage(browser, url) {
   const bumblePage = await setupPage(browser, "https://bumble.com/app");
 
   await Promise.all([
-    runBumbleInteraction(bumblePage, "bumble"),
+    // runBumbleInteraction(bumblePage, "bumble"),
     runTinderInteraction(tinderPage, "tinder"),
   ]);
 })();

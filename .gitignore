@@ -4,3 +4,6 @@ node_modules/
 *.log
 npm-debug.log
 config/db.js
+BumblePic.png
+TinderPic.png
+Nopes/
