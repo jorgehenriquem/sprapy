@@ -56,6 +56,7 @@ async function runTinderInteraction(page) {
         },
       };
       const result = await model.generateContent([prompt, image]);
+      await sleep(1000);
       const response = await result.response;
       const text = response.text();
       // console.log("Resposta do gemini:" + text);
@@ -77,6 +78,7 @@ async function runTinderInteraction(page) {
     } catch (error) {
       consoleLogWithStyle(error.message, "31");
       await saveProfileScreenshot(page, "Yes/Error");
+      await randomScroll(page);
       await decideLikeOrNope(page, "Sim");
       consoleLogWithStyle("Sim Pelo erro 2", "31");
     }
@@ -229,7 +231,7 @@ async function matchPoints(tinderJson, page) {
 
   console.log(`Total de pontos: ${totalPoints}`);
 
-  if (totalPoints >= 15) {
+  if (totalPoints >= 14) {
     await saveProfileScreenshot(page, "Yes/Tinder/Sup");
     await randomScroll(page);
     consoleLogWithStyle("Mega Match!", "34");
