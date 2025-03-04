@@ -25,7 +25,8 @@ async function runTinderInteraction(page) {
       );
       if (blackList) {
         await saveProfileScreenshot(page, "Nopes/Blacklist");
-        await decideLikeOrNope(page, "Não");
+        await clickActionKey(page, "Não");
+        await openProfile(page);
       }
       const screenWidth = 1600;
       const screenHeight = 900;
@@ -229,16 +230,17 @@ async function matchPoints(tinderJson, page) {
   console.log(`Total de pontos: ${totalPoints}`);
 
   if (totalPoints >= 15) {
+    await saveProfileScreenshot(page, "Yes/Tinder/Sup");
+    await randomScroll(page);
+    consoleLogWithStyle("Mega Match!", "34");
+    await decideLikeOrNope(page, "Sim");
+  } else if (totalPoints >= 8) {
     await saveProfileScreenshot(page, "Yes/Tinder");
     await randomScroll(page);
-    console.log("Mega Match!");
-    await decideLikeOrNope(page, "Sim");
-  } else if (totalPoints >= 9) {
-    await randomScroll(page);
-    console.log("Match");
+    consoleLogWithStyle("Match", "32");
     await decideLikeOrNope(page, "Sim");
   } else {
-    console.log("Nope");
+    consoleLogWithStyle("Nope", "31");
     await decideLikeOrNope(page, "Não");
   }
 }
