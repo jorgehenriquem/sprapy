@@ -206,6 +206,13 @@ async function isSelectorVisible(page, selector) {
     .catch(() => false);
 }
 
+/**
+ * Matches points based on the provided tinderJson and updates the total points.
+ * Logs each matched category, name, and points, and decides whether to like or nope based on the total points.
+ *
+ * @param {string|object} tinderJson - The JSON string or object containing the Tinder profile data.
+ * @param {object} page - Puppeteer page object.
+ */
 async function matchPoints(tinderJson, page) {
   tinderJson = tinderJson.replace("```json", "");
   tinderJson = tinderJson.replace("```", "");
@@ -245,6 +252,12 @@ async function matchPoints(tinderJson, page) {
   }
 }
 
+/**
+ * Saves a screenshot of the profile to the specified folder.
+ *
+ * @param {object} page - Puppeteer page object.
+ * @param {string} folder - The folder where the screenshot will be saved.
+ */
 async function saveProfileScreenshot(page, folder) {
   const screenWidth = 1920;
   const screenHeight = 1080;
