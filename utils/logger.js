@@ -8,10 +8,7 @@ function formatConsoleDate(date) {
 }
 
 function consoleLogWithStyle(message, colorCode = 37) {
-  console.log(
-    `\x1b[${colorCode}m%s\x1b[0m`,
-    `${formatConsoleDate(new Date())} ${message}`
-  );
+  console.log(`\x1b[${colorCode}m%s\x1b[0m`, `${message}`);
 }
 
 module.exports = {

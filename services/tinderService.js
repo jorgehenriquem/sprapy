@@ -24,21 +24,9 @@ async function runTinderInteraction(page) {
         process.env.BLACKLIST_WORDS.split(",")
       );
       if (blackList) {
-        const screenWidth = 1920;
-        const screenHeight = 1080;
-        const clip = {
-          x: screenWidth / 4,
-          y: 0,
-          width: screenWidth / 2,
-          height: screenHeight,
-        };
-        const screenshotBuffer = await page.screenshot({ clip });
-        const currentDate = new Date();
-        const timestamp = currentDate.toISOString().replace(/:/g, "-");
-        const fileName = `Nopes/Blacklist/BlacklistPic_${timestamp}.png`;
-
-        fs.writeFileSync(fileName, screenshotBuffer);
-        await decideLikeOrNope(page, "Não");
+        await saveProfileScreenshot(page, "Nopes/Blacklist");
+        await clickActionKey(page, "Não");
+        await openProfile(page);
       }
       const screenWidth = 1600;
       const screenHeight = 900;
@@ -57,8 +45,8 @@ async function runTinderInteraction(page) {
       const screenshotBuffer = await page.screenshot({ clip });
       fs.writeFileSync("TinderPic.png", screenshotBuffer);
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); //mudar
-      const prompt = process.env.PROMPT;
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const prompt = process.env.PROMPT2;
       const image = {
         inlineData: {
           data: Buffer.from(fs.readFileSync("TinderPic.png")).toString(
@@ -68,9 +56,10 @@ async function runTinderInteraction(page) {
         },
       };
       const result = await model.generateContent([prompt, image]);
+      await sleep(1000);
       const response = await result.response;
       const text = response.text();
-      console.log("Resposta do gemini:" + text);
+      // console.log("Resposta do gemini:" + text);
       try {
         await page.waitForFunction(
           () =>
@@ -79,35 +68,17 @@ async function runTinderInteraction(page) {
             ),
           { timeout: 20000 }
         );
-        if (text.includes("Sim") || text.includes("sim")) {
-          const screenWidth = 1920;
-          const screenHeight = 1080;
-          const clip = {
-            x: screenWidth / 4,
-            y: 0,
-            width: screenWidth / 2,
-            height: screenHeight,
-          };
-          const screenshotBuffer = await page.screenshot({ clip });
-          const currentDate = new Date();
-          const timestamp = currentDate.toISOString().replace(/:/g, "-");
-          const fileName = `Nopes/Tinder/TinderPic_${timestamp}.png`;
-
-          fs.writeFileSync(fileName, screenshotBuffer);
-          await decideLikeOrNope(page, "Não");
-        } else {
-          await randomScroll(page);
-          await decideLikeOrNope(page, "Sim");
-        }
+        await matchPoints(text, page);
       } catch (error) {
         consoleLogWithStyle(error.message, "31");
-        await decideLikeOrNope(page, "Sim");
-        consoleLogWithStyle("Sim Pelo erro", "31");
+        await decideLikeOrNope(page, "Não");
+        consoleLogWithStyle("Não Pelo erro", "31");
       }
     } catch (error) {
       consoleLogWithStyle(error.message, "31");
-      await decideLikeOrNope(page, "Sim");
-      consoleLogWithStyle("Sim Pelo erro 2", "31");
+      await randomScroll(page);
+      await decideLikeOrNope(page, "Não");
+      consoleLogWithStyle("Não Pelo erro 2", "31");
     }
 
     await rejectSuperLike(page);
@@ -233,6 +204,62 @@ async function isSelectorVisible(page, selector) {
     .waitForSelector(selector, { visible: true, timeout: 5000 })
     .then(() => true)
     .catch(() => false);
+}
+
+async function matchPoints(tinderJson, page) {
+  tinderJson = tinderJson.replace("```json", "");
+  tinderJson = tinderJson.replace("```", "");
+  tinderJson = JSON.parse(tinderJson);
+
+  const pointsData = JSON.parse(fs.readFileSync("points.json"));
+  let totalPoints = 0;
+
+  for (const key in tinderJson) {
+    const value = tinderJson[key].toLowerCase();
+    const pointItems = pointsData.filter(
+      (item) =>
+        item.category.toLowerCase() === key.toLowerCase() &&
+        value.includes(item.name.toLowerCase())
+    );
+    for (const pointItem of pointItems) {
+      totalPoints += pointItem.points;
+      console.log(`${key}: ${pointItem.name}(${pointItem.points})`);
+    }
+  }
+
+  console.log(`Total de pontos: ${totalPoints}`);
+
+  if (totalPoints >= 14) {
+    await saveProfileScreenshot(page, "Yes/Tinder/Sup");
+    await randomScroll(page);
+    consoleLogWithStyle("Mega Match!", "34");
+    await decideLikeOrNope(page, "Sim");
+  } else if (totalPoints >= 8) {
+    await saveProfileScreenshot(page, "Yes/Tinder");
+    await randomScroll(page);
+    consoleLogWithStyle("Match", "32");
+    await decideLikeOrNope(page, "Sim");
+  } else {
+    consoleLogWithStyle("Nope", "31");
+    await decideLikeOrNope(page, "Não");
+  }
+}
+
+async function saveProfileScreenshot(page, folder) {
+  const screenWidth = 1920;
+  const screenHeight = 1080;
+  const clip = {
+    x: screenWidth / 4,
+    y: 0,
+    width: screenWidth / 2,
+    height: screenHeight,
+  };
+  const screenshotBuffer = await page.screenshot({ clip });
+  const currentDate = new Date();
+  const timestamp = currentDate.toISOString().replace(/:/g, "-");
+  const fileName = folder + `/TinderPic_${timestamp}.png`;
+
+  fs.writeFileSync(fileName, screenshotBuffer);
 }
 
 module.exports = {
