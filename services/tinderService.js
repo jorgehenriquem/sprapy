@@ -71,16 +71,14 @@ async function runTinderInteraction(page) {
         await matchPoints(text, page);
       } catch (error) {
         consoleLogWithStyle(error.message, "31");
-        await saveProfileScreenshot(page, "Yes/Error");
-        await decideLikeOrNope(page, "Sim");
-        consoleLogWithStyle("Sim Pelo erro", "31");
+        await decideLikeOrNope(page, "Não");
+        consoleLogWithStyle("Não Pelo erro", "31");
       }
     } catch (error) {
       consoleLogWithStyle(error.message, "31");
-      await saveProfileScreenshot(page, "Yes/Error");
       await randomScroll(page);
-      await decideLikeOrNope(page, "Sim");
-      consoleLogWithStyle("Sim Pelo erro 2", "31");
+      await decideLikeOrNope(page, "Não");
+      consoleLogWithStyle("Não Pelo erro 2", "31");
     }
 
     await rejectSuperLike(page);
