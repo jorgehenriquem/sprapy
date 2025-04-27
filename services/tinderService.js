@@ -8,6 +8,39 @@ const {
 const { consoleLogWithStyle } = require("../utils/logger");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
+const AIHandler = {
+  getRandomKey() {
+    return [
+      process.env.GEMINI_KEY,
+      process.env.GEMINI_KEY2,
+      process.env.GEMINI_KEY3,
+    ][Math.floor(Math.random() * 3)];
+  },
+
+  async initialize() {
+    const randomGeminiKey = this.getRandomKey();
+    this.genAI = new GoogleGenerativeAI(randomGeminiKey);
+    this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    this.prompt = process.env.PROMPT2;
+  },
+
+  async prepareImage(screenshotBuffer) {
+    this.image = {
+      inlineData: {
+        data: Buffer.from(screenshotBuffer).toString("base64"),
+        mimeType: "image/png",
+      },
+    };
+  },
+
+  async analyzeImage() {
+    const result = await this.model.generateContent([this.prompt, this.image]);
+    await sleep(1000);
+    const response = await result.response;
+    return response.text();
+  }
+};
+
 async function runTinderInteraction(page) {
   while (true) {
     await sleep(1000);
@@ -45,27 +78,11 @@ async function runTinderInteraction(page) {
       };
       const screenshotBuffer = await page.screenshot({ clip });
       fs.writeFileSync("TinderPic.png", screenshotBuffer);
-      const randomGeminiKey = [
-        process.env.GEMINI_KEY,
-        process.env.GEMINI_KEY2,
-        process.env.GEMINI_KEY3,
-      ][Math.floor(Math.random() * 3)];
-      const genAI = new GoogleGenerativeAI(randomGeminiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const prompt = process.env.PROMPT2;
-      const image = {
-        inlineData: {
-          data: Buffer.from(fs.readFileSync("TinderPic.png")).toString(
-            "base64"
-          ),
-          mimeType: "image/png",
-        },
-      };
-      const result = await model.generateContent([prompt, image]);
-      await sleep(1000);
-      const response = await result.response;
-      const text = response.text();
-      // console.log("Resposta do gemini:" + text);
+
+      await AIHandler.initialize();
+      await AIHandler.prepareImage(screenshotBuffer);
+      const aiResponse = await AIHandler.analyzeImage();
+
       try {
         await page.waitForFunction(
           () =>
@@ -74,7 +91,7 @@ async function runTinderInteraction(page) {
             ),
           { timeout: 20000 }
         );
-        await matchPoints(text, page);
+        await matchPoints(aiResponse, page);
       } catch (error) {
         consoleLogWithStyle(error.message, "31");
         const waitMilliseconds = Math.floor(
