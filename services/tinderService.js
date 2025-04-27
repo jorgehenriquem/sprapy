@@ -20,8 +20,12 @@ const AIHandler = {
   async initialize() {
     const randomGeminiKey = this.getRandomKey();
     this.genAI = new GoogleGenerativeAI(randomGeminiKey);
-    this.modelImage = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    this.modelConversation = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    this.modelImage = this.genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+    });
+    this.modelConversation = this.genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+    });
     this.promptImage = process.env.PROMPT_IMAGE;
     this.promptConversation = process.env.PROMPT_CONVERSATION;
   },
@@ -36,17 +40,23 @@ const AIHandler = {
   },
 
   async analyzeImage() {
-    const result = await this.modelImage.generateContent([this.promptImage, this.image]);
+    const result = await this.modelImage.generateContent([
+      this.promptImage,
+      this.image,
+    ]);
     await sleep(1000);
     const response = await result.response;
     return response.text();
   },
 
   async analyzeConversation(messages) {
-    const result = await this.modelConversation.generateContent([this.promptConversation, messages]);
+    const result = await this.modelConversation.generateContent([
+      this.promptConversation,
+      messages,
+    ]);
     const response = await result.response;
     return response.text();
-  }
+  },
 };
 
 async function runTinderInteraction(page) {
@@ -60,7 +70,6 @@ async function runTinderInteraction(page) {
       await sleep(1000);
       await openProfile(page);
       await extractBioInfo(page);
-      // console.log("Abrindo perfil");
       await sleep(1000);
       const blackList = await findWordsInPage(
         page,
@@ -70,6 +79,7 @@ async function runTinderInteraction(page) {
         await clickActionKey(page, "Não");
         await openProfile(page);
       }
+
       const screenWidth = 1600;
       const screenHeight = 900;
       await page.setViewport({
@@ -111,7 +121,12 @@ async function runTinderInteraction(page) {
         );
         await page.waitForTimeout(waitMilliseconds);
         consoleLogWithStyle("Atualizando", "32");
-        await page.reload();
+
+        if (Math.random() < 0.5) {
+          await page.reload();
+        } else {
+          await TinderConversation(page);
+        }
       }
     } catch (error) {
       consoleLogWithStyle(error.message, "31");
@@ -180,8 +195,9 @@ async function singleInstaBioVerification(bioInfo, kilometer = "") {
   console.log("Distancia", kilometer);
 
   if (instaWords && instaWords.length > 0) {
-    // Remove duplicatas
-    const uniqueInstaWords = [...new Set(instaWords)];
+    const uniqueInstaWords = [...new Set(instaWords)].map((word) =>
+      word.replace("@", "")
+    );
 
     // Adiciona as palavras ao arquivo insta.txt, cada uma em uma nova linha
     uniqueInstaWords.forEach((word) => {
@@ -356,28 +372,61 @@ async function saveProfileScreenshot(page, folder) {
 }
 
 function formatConversationString(messages) {
-  return messages.map((message) => {
-    const prefix = message.type === "sent" ? "me:" : "her:";
-    return `${prefix} ${message.message}`;
-  }).join(" ");
+  return messages
+    .map((message) => {
+      const prefix = message.type === "sent" ? "me:" : "her:";
+      return `${prefix} ${message.message}`;
+    })
+    .join(" ");
 }
 
 async function TinderConversation(page) {
-  const { messages } = await extractConversations(page);
-  const conversationString = formatConversationString(messages);
+  await page.waitForSelector('a[href^="/app/messages/"]');
+  await page.evaluate(() => {
+    const buttons = Array.from(document.querySelectorAll("button"));
+    const targetButton = buttons.find((button) => {
+      return (
+        button.type === "button" && button.textContent.trim() === "Mensagens"
+      );
+    });
+    if (targetButton) {
+      targetButton.click();
+    }
+  });
+  const links = await getConversationPages(page);
+  let interactionCount = 0;
 
-  // Inicializar o AIHandler antes de usar
-  await AIHandler.initialize();
-  
-  //mandar contexto de conversa para o AI e pedir a melhor resposta para a conversa com o intuito de manter a conversa fluida e natural
-  const aiResponse = await AIHandler.analyzeConversation(conversationString);
+  for (const link of links) {
+    if (interactionCount >= 3) {
+      console.log("Limite de 3 interações atingido.");
+      break;
+    }
+
+    await page.goto(link, { waitUntil: "networkidle2" });
+    const { messages } = await extractConversations(page);
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage.type === "sent") {
+      console.log("Última mensagem é do usuário (me), pulando...");
+      continue;
+    }
+    interactionCount++;
+    const conversationString = formatConversationString(messages);
+    await AIHandler.initialize();
+    const aiResponse = await AIHandler.analyzeConversation(conversationString);
+    await sendMessage(page, aiResponse);
+    await sleep(1000);
+  }
+
+  await page.goto("https://tinder.com/app/recs", { waitUntil: "networkidle2" });
+  await runTinderInteraction(page);
 }
 
 async function TinderFirstMessage(page) {
-  await acessFisrtMatch(page);
+  const links = await getConversationPages(page);
+  await sayHiMessage(links, page);
 }
 
-async function acessFisrtMatch(page) {
+async function getConversationPages(page) {
   await page.waitForSelector('a[href^="/app/messages/"]');
 
   const links = await page.evaluate(() => {
@@ -389,17 +438,15 @@ async function acessFisrtMatch(page) {
     );
   });
 
-  await sayHiMessage(links, page);
+  return links;
 }
 
 async function sendMessage(page, message) {
   await randomScroll(page);
   await page.waitForSelector('textarea[placeholder="Digite uma mensagem"]');
-  await page.type(
-    'textarea[placeholder="Digite uma mensagem"]',
-    message,
-    { delay: 100 }
-  );
+  await page.type('textarea[placeholder="Digite uma mensagem"]', message, {
+    delay: 100,
+  });
 
   await page.waitForSelector('button[type="submit"] span');
   await page.click('button[type="submit"]');
