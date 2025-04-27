@@ -1,3 +1,4 @@
+const fs = require("fs");
 const {
   sleep,
   findWordsInPage,
@@ -6,7 +7,6 @@ const {
 } = require("../utils/helpers");
 const { consoleLogWithStyle } = require("../utils/logger");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const fs = require("fs");
 
 async function runTinderInteraction(page) {
   while (true) {
@@ -18,13 +18,14 @@ async function runTinderInteraction(page) {
     try {
       await sleep(1000);
       await openProfile(page);
+      await extractBioInfo(page);
+      // console.log("Abrindo perfil");
       await sleep(1000);
       const blackList = await findWordsInPage(
         page,
         process.env.BLACKLIST_WORDS.split(",")
       );
       if (blackList) {
-        await saveProfileScreenshot(page, "Nopes/Blacklist");
         await clickActionKey(page, "Não");
         await openProfile(page);
       }
@@ -44,7 +45,12 @@ async function runTinderInteraction(page) {
       };
       const screenshotBuffer = await page.screenshot({ clip });
       fs.writeFileSync("TinderPic.png", screenshotBuffer);
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
+      const randomGeminiKey = [
+        process.env.GEMINI_KEY,
+        process.env.GEMINI_KEY2,
+        process.env.GEMINI_KEY3,
+      ][Math.floor(Math.random() * 3)];
+      const genAI = new GoogleGenerativeAI(randomGeminiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const prompt = process.env.PROMPT2;
       const image = {
@@ -71,8 +77,16 @@ async function runTinderInteraction(page) {
         await matchPoints(text, page);
       } catch (error) {
         consoleLogWithStyle(error.message, "31");
-        await decideLikeOrNope(page, "Não");
-        consoleLogWithStyle("Não Pelo erro", "31");
+        const waitMilliseconds = Math.floor(
+          Math.random() * (2 * 60 * 1000 - 1 * 60 * 1000 + 1) + 1 * 60 * 1000
+        );
+        consoleLogWithStyle(
+          `Aguardando para atualizar, timeout de ${waitMilliseconds / 1000} segundos`,
+          "34"
+        );
+        await page.waitForTimeout(waitMilliseconds);
+        consoleLogWithStyle("Atualizando", "32");
+        await page.reload();
       }
     } catch (error) {
       consoleLogWithStyle(error.message, "31");
@@ -135,27 +149,68 @@ async function randomScroll(page) {
  * @param {object} page - Puppeteer page object.
  * @returns {boolean} - True if exactly one <div> element contains a single word starting with "@"; otherwise, false.
  */
-async function singleInstaBioVerification(page) {
-  const result = await page.evaluate(() => {
-    const elements = document.querySelectorAll(
-      "div[class*='Px(16px)'][class*='Py(12px)'][class*='Us(t)'] > div"
+async function singleInstaBioVerification(bioInfo, kilometer = "") {
+  // Usa uma expressão regular para encontrar todas as palavras que começam com '@'
+  const instaWords = bioInfo.match(/@\w+/g);
+  console.log("Distancia", kilometer);
+
+  if (instaWords && instaWords.length > 0) {
+    // Remove duplicatas
+    const uniqueInstaWords = [...new Set(instaWords)];
+
+    // Adiciona as palavras ao arquivo insta.txt, cada uma em uma nova linha
+    uniqueInstaWords.forEach((word) => {
+      fs.appendFileSync(
+        "insta.txt",
+        `https://www.instagram.com/${word} ${kilometer}km\n`
+      );
+    });
+
+    console.log(
+      "Palavras encontradas e adicionadas ao arquivo insta.txt:",
+      uniqueInstaWords
+    );
+  }
+}
+
+async function extractBioInfo(page) {
+  const bioInfo = await page.evaluate(() => {
+    const aboutMeElement = Array.from(document.querySelectorAll("div")).find(
+      (div) => div.textContent.trim() === "Sobre mim"
     );
 
-    let wordCount = 0;
-    let wordStartingWithAt = false;
+    let kilometerText = "";
+    let kilometer = "";
 
-    for (const element of elements) {
-      const words = element.textContent.trim().split(/\s+/);
-      if (words.length === 1 && words[0].startsWith("@")) {
-        wordCount++;
-        wordStartingWithAt = true;
+    // Se o elemento for encontrado, retorna o texto da div abaixo dele
+    if (aboutMeElement) {
+      const kilometerElement = Array.from(
+        document.querySelectorAll("div")
+      ).find((div) => div.textContent.includes("quilômetros daqui"));
+      console.log(kilometerElement);
+
+      const match = kilometerElement.textContent.match(
+        /(\d+)\s*quilômetros daqui/
+      );
+      if (match) {
+        kilometerText = match[1]; // Captura o número como texto
       }
+
+      const nextSibling = aboutMeElement.nextElementSibling;
+      return {
+        bio: nextSibling ? nextSibling.textContent.trim() : null,
+        kilometer: kilometerText,
+      };
     }
 
-    return wordCount === 1 && wordStartingWithAt;
+    return { bio: null, kilometer: "" }; // Retorna null se "Sobre mim" não for encontrado
   });
 
-  return result;
+  if (bioInfo.bio) {
+    await singleInstaBioVerification(bioInfo.bio, bioInfo.kilometer);
+  }
+
+  return bioInfo;
 }
 
 /**
@@ -237,12 +292,12 @@ async function matchPoints(tinderJson, page) {
   console.log(`Total de pontos: ${totalPoints}`);
 
   if (totalPoints >= 14) {
-    await saveProfileScreenshot(page, "Yes/Tinder/Sup");
+    // await saveProfileScreenshot(page, "Yes/Tinder/Sup");
     await randomScroll(page);
     consoleLogWithStyle("Mega Match!", "34");
     await decideLikeOrNope(page, "Sim");
   } else if (totalPoints >= 8) {
-    await saveProfileScreenshot(page, "Yes/Tinder");
+    // await saveProfileScreenshot(page, "Yes/Tinder");
     await randomScroll(page);
     consoleLogWithStyle("Match", "32");
     await decideLikeOrNope(page, "Sim");
@@ -275,6 +330,109 @@ async function saveProfileScreenshot(page, folder) {
   fs.writeFileSync(fileName, screenshotBuffer);
 }
 
+async function TinderConversation(page) {
+  console.log("Iniciando conversa");
+  const { messages } = await extractConversations(page);
+
+  //com o objeto messages, pegar as mensagens e formatar para um formato simples de string
+  const messagesString = messages.map((message) => `${message.time} - ${message.message}`).join("\n");
+  console.log(messagesString, "messagesString");
+}
+
+async function TinderFirstMessage(page) {
+  await acessFisrtMatch(page);
+}
+
+async function acessFisrtMatch(page) {
+  await page.waitForSelector('a[href^="/app/messages/"]');
+
+  const links = await page.evaluate(() => {
+    const anchors = Array.from(
+      document.querySelectorAll('a[href^="/app/messages/"]')
+    );
+    return anchors.map(
+      (anchor) => `https://tinder.com${anchor.getAttribute("href")}`
+    );
+  });
+
+  await sayHiMessage(links, page);
+}
+
+async function sayHiMessage(links, page) {
+  let interactionCount = 0;
+
+  for (const link of links) {
+    if (interactionCount >= 15) {
+      console.log("Limite de 20 interações atingido.");
+      page.close();
+    }
+    console.log("Acessando:", link);
+    await page.goto(link, { waitUntil: "networkidle2" });
+    await randomScroll(page);
+    await page.waitForSelector('textarea[placeholder="Digite uma mensagem"]');
+    const messagesData = JSON.parse(fs.readFileSync("messages.json"));
+    const randomMessageObj =
+      messagesData[Math.floor(Math.random() * messagesData.length)];
+    const messageToSend = randomMessageObj.message;
+    await page.type(
+      'textarea[placeholder="Digite uma mensagem"]',
+      messageToSend,
+      { delay: 100 }
+    );
+
+    await page.waitForSelector('button[type="submit"] span');
+    await page.click('button[type="submit"]');
+    await openProfile(page);
+    await randomScroll(page);
+    interactionCount++;
+    await page.waitForTimeout(
+      Math.floor(Math.random() * (3000 - 1000 + 1)) + 1000
+    );
+  }
+}
+
+async function extractConversations(page) {
+  await page.waitForSelector('[aria-label="Histórico de conversas"]');
+  await page.waitForSelector(".profileContent");
+  await sleep(1000);
+  console.log("Aguardando 1 segundo");
+
+  const messages = await page.evaluate(() => {
+    let messageHelpers = document.querySelectorAll(".msgHelper");
+    let messagesArray = [];
+
+    messageHelpers.forEach((msgHelper, index) => {
+      console.log(`Mensagem ${index + 1}:`, msgHelper.innerHTML);
+
+      let timeElement = msgHelper.querySelector("time");
+      let messageElement = msgHelper.querySelector(".msg .text");
+
+      if (timeElement && messageElement) {
+        let messageType = "unknown"; // Default para "unknown"
+
+        if (msgHelper.querySelector(".msgBackground--received")) {
+          messageType = "received";
+        }
+        if (msgHelper.innerHTML.includes("send")) {
+          messageType = "sent";
+        }
+
+        messagesArray.push({
+          time: timeElement.getAttribute("datetime"),
+          message: messageElement.innerText.trim(),
+          type: messageType,
+        });
+      }
+    });
+
+    return { count: messageHelpers.length, messages: messagesArray };
+  });
+
+  return messages;
+}
+
 module.exports = {
   runTinderInteraction,
+  TinderConversation,
+  TinderFirstMessage,
 };
