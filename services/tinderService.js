@@ -20,8 +20,10 @@ const AIHandler = {
   async initialize() {
     const randomGeminiKey = this.getRandomKey();
     this.genAI = new GoogleGenerativeAI(randomGeminiKey);
-    this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    this.prompt = process.env.PROMPT2;
+    this.modelImage = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    this.modelConversation = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    this.promptImage = process.env.PROMPT_IMAGE;
+    this.promptConversation = process.env.PROMPT_CONVERSATION;
   },
 
   async prepareImage(screenshotBuffer) {
@@ -34,8 +36,14 @@ const AIHandler = {
   },
 
   async analyzeImage() {
-    const result = await this.model.generateContent([this.prompt, this.image]);
+    const result = await this.modelImage.generateContent([this.promptImage, this.image]);
     await sleep(1000);
+    const response = await result.response;
+    return response.text();
+  },
+
+  async analyzeConversation(messages) {
+    const result = await this.modelConversation.generateContent([this.promptConversation, messages]);
     const response = await result.response;
     return response.text();
   }
@@ -347,18 +355,22 @@ async function saveProfileScreenshot(page, folder) {
   fs.writeFileSync(fileName, screenshotBuffer);
 }
 
-function formatMessagesToJson(messages) {
-  return messages.map((message) => ({
-    type: message.type === "sent" ? "me" : "her",
-    message: message.message
-  }));
+function formatConversationString(messages) {
+  return messages.map((message) => {
+    const prefix = message.type === "sent" ? "me:" : "her:";
+    return `${prefix} ${message.message}`;
+  }).join(" ");
 }
 
 async function TinderConversation(page) {
   const { messages } = await extractConversations(page);
+  const conversationString = formatConversationString(messages);
 
-  const messagesJson = formatMessagesToJson(messages);
-  console.log(JSON.stringify(messagesJson, null, 2));
+  // Inicializar o AIHandler antes de usar
+  await AIHandler.initialize();
+  
+  //mandar contexto de conversa para o AI e pedir a melhor resposta para a conversa com o intuito de manter a conversa fluida e natural
+  const aiResponse = await AIHandler.analyzeConversation(conversationString);
 }
 
 async function TinderFirstMessage(page) {
