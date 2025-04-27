@@ -392,6 +392,21 @@ async function acessFisrtMatch(page) {
   await sayHiMessage(links, page);
 }
 
+async function sendMessage(page, message) {
+  await randomScroll(page);
+  await page.waitForSelector('textarea[placeholder="Digite uma mensagem"]');
+  await page.type(
+    'textarea[placeholder="Digite uma mensagem"]',
+    message,
+    { delay: 100 }
+  );
+
+  await page.waitForSelector('button[type="submit"] span');
+  await page.click('button[type="submit"]');
+  await openProfile(page);
+  await randomScroll(page);
+}
+
 async function sayHiMessage(links, page) {
   let interactionCount = 0;
 
@@ -402,23 +417,15 @@ async function sayHiMessage(links, page) {
     }
     console.log("Acessando:", link);
     await page.goto(link, { waitUntil: "networkidle2" });
-    await randomScroll(page);
-    await page.waitForSelector('textarea[placeholder="Digite uma mensagem"]');
+    interactionCount++;
+
     const messagesData = JSON.parse(fs.readFileSync("messages.json"));
     const randomMessageObj =
       messagesData[Math.floor(Math.random() * messagesData.length)];
     const messageToSend = randomMessageObj.message;
-    await page.type(
-      'textarea[placeholder="Digite uma mensagem"]',
-      messageToSend,
-      { delay: 100 }
-    );
 
-    await page.waitForSelector('button[type="submit"] span');
-    await page.click('button[type="submit"]');
-    await openProfile(page);
-    await randomScroll(page);
-    interactionCount++;
+    await sendMessage(page, messageToSend);
+
     await page.waitForTimeout(
       Math.floor(Math.random() * (3000 - 1000 + 1)) + 1000
     );
