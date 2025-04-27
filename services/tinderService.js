@@ -330,13 +330,18 @@ async function saveProfileScreenshot(page, folder) {
   fs.writeFileSync(fileName, screenshotBuffer);
 }
 
+function formatMessagesToJson(messages) {
+  return messages.map((message) => ({
+    type: message.type === "sent" ? "me" : "her",
+    message: message.message
+  }));
+}
+
 async function TinderConversation(page) {
-  console.log("Iniciando conversa");
   const { messages } = await extractConversations(page);
 
-  //com o objeto messages, pegar as mensagens e formatar para um formato simples de string
-  const messagesString = messages.map((message) => `${message.time} - ${message.message}`).join("\n");
-  console.log(messagesString, "messagesString");
+  const messagesJson = formatMessagesToJson(messages);
+  console.log(JSON.stringify(messagesJson, null, 2));
 }
 
 async function TinderFirstMessage(page) {
@@ -395,7 +400,6 @@ async function extractConversations(page) {
   await page.waitForSelector('[aria-label="Histórico de conversas"]');
   await page.waitForSelector(".profileContent");
   await sleep(1000);
-  console.log("Aguardando 1 segundo");
 
   const messages = await page.evaluate(() => {
     let messageHelpers = document.querySelectorAll(".msgHelper");
