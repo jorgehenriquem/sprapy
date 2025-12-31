@@ -122,17 +122,13 @@ async function runTinderInteraction(page) {
         await page.waitForTimeout(waitMilliseconds);
         consoleLogWithStyle("Atualizando", "32");
 
-        if (Math.random() < 0.5) {
-          await page.reload();
-        } else {
-          await TinderConversation(page);
-        }
+        await TinderConversation(page);
+        // await page.reload();
       }
     } catch (error) {
       consoleLogWithStyle(error.message, "31");
       await randomScroll(page);
-      await decideLikeOrNope(page, "Não");
-      consoleLogWithStyle("Não Pelo erro 2", "31");
+      await TinderConversation(page);
     }
 
     await rejectSuperLike(page);
@@ -381,6 +377,7 @@ function formatConversationString(messages) {
 }
 
 async function TinderConversation(page) {
+  await page.goto("https://tinder.com/app/recs", { waitUntil: "networkidle2" });
   await page.waitForSelector('a[href^="/app/messages/"]');
   await page.evaluate(() => {
     const buttons = Array.from(document.querySelectorAll("button"));
@@ -394,9 +391,10 @@ async function TinderConversation(page) {
     }
   });
   const links = await getConversationPages(page);
+  const limitedLinks = links.slice(0, 10);
   let interactionCount = 0;
 
-  for (const link of links) {
+  for (const link of limitedLinks) {
     if (interactionCount >= 3) {
       console.log("Limite de 3 interações atingido.");
       break;
@@ -405,6 +403,7 @@ async function TinderConversation(page) {
     await page.goto(link, { waitUntil: "networkidle2" });
     const { messages } = await extractConversations(page);
     const lastMessage = messages[messages.length - 1];
+
     if (lastMessage.type === "sent") {
       console.log("Última mensagem é do usuário (me), pulando...");
       continue;
@@ -414,7 +413,6 @@ async function TinderConversation(page) {
     await AIHandler.initialize();
     const aiResponse = await AIHandler.analyzeConversation(conversationString);
     await sendMessage(page, aiResponse);
-    await sleep(1000);
   }
 
   await page.goto("https://tinder.com/app/recs", { waitUntil: "networkidle2" });
@@ -481,8 +479,6 @@ async function sayHiMessage(links, page) {
 
 async function extractConversations(page) {
   await page.waitForSelector('[aria-label="Histórico de conversas"]');
-  await page.waitForSelector(".profileContent");
-  await sleep(1000);
 
   const messages = await page.evaluate(() => {
     let messageHelpers = document.querySelectorAll(".msgHelper");

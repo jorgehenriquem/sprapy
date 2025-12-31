@@ -18,10 +18,13 @@ const bumbleService = require("./services/bumbleService");
   });
 
   const tinderPage = await setupPage(browser, "https://tinder.com/app/recs");
+  // const tinderPageConversarion = await setupPage(browser, "https://tinder.com/app/messages/647fadec9b1780010005197365c03ac1efcb0a0100cdcc05");
   // const bumblePage = await setupPage(browser, "https://bumble.com/app");
 
   await Promise.all([
-    tinderService.runTinderInteraction(tinderPage),
+    // tinderService.runTinderInteraction(tinderPage),
+    tinderService.TinderFirstMessage(tinderPage),
+    // tinderService.TinderConversation(tinderPage),
     // bumbleService.runBumbleInteraction(bumblePage),
   ]);
 })();
