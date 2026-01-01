@@ -9,7 +9,12 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const fs = require("fs");
 
 async function runTinderInteraction(page) {
-  while (true) {
+  let swipeCount = 0;
+  let likeCount = 0;
+  const MAX_SWIPES = 300;
+  const MAX_LIKES = 75; // 25% de 300
+  
+  while (swipeCount < MAX_SWIPES) {
     await sleep(1000);
     let selectorVisible = await isSelectorVisible(
       page,
@@ -26,6 +31,8 @@ async function runTinderInteraction(page) {
       if (blackList) {
         await saveProfileScreenshot(page, "Nopes/Blacklist");
         await clickActionKey(page, "Não");
+        swipeCount++;
+        consoleLogWithStyle(`Swipes realizados: ${swipeCount}/${MAX_SWIPES}`, "35");
         await openProfile(page);
       }
       const screenWidth = 1600;
@@ -44,9 +51,15 @@ async function runTinderInteraction(page) {
       };
       const screenshotBuffer = await page.screenshot({ clip });
       fs.writeFileSync("TinderPic.png", screenshotBuffer);
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const prompt = process.env.PROMPT2;
+      const geminiKeys = [
+        process.env.GEMINI_KEY,
+        process.env.GEMINI_KEY2,
+        process.env.GEMINI_KEY3,
+      ];
+      const randomKey = geminiKeys[Math.floor(Math.random() * geminiKeys.length)];
+      const genAI = new GoogleGenerativeAI(randomKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite" });
+      const prompt = process.env.PROMPT_IMAGE;
       const image = {
         inlineData: {
           data: Buffer.from(fs.readFileSync("TinderPic.png")).toString(
@@ -64,25 +77,37 @@ async function runTinderInteraction(page) {
         await page.waitForFunction(
           () =>
             Array.from(document.querySelectorAll('button[type="button"]')).some(
-              (button) => button.textContent.includes("Denunciar")
+              (button) => button.textContent.includes("Hide") || button.textContent.includes("Ocultar")
             ),
           { timeout: 20000 }
         );
-        await matchPoints(text, page);
+        const gaveLike = await matchPoints(text, page, { likeCount, MAX_LIKES });
+        swipeCount++;
+        if (gaveLike) {
+          likeCount++;
+          consoleLogWithStyle(`Likes dados: ${likeCount}/${MAX_LIKES}`, "36");
+        }
+        consoleLogWithStyle(`Swipes realizados: ${swipeCount}/${MAX_SWIPES}`, "35");
       } catch (error) {
         consoleLogWithStyle(error.message, "31");
         await decideLikeOrNope(page, "Não");
+        swipeCount++;
+        consoleLogWithStyle(`Swipes realizados: ${swipeCount}/${MAX_SWIPES}`, "35");
         consoleLogWithStyle("Não Pelo erro", "31");
       }
     } catch (error) {
       consoleLogWithStyle(error.message, "31");
       await randomScroll(page);
       await decideLikeOrNope(page, "Não");
+      swipeCount++;
+      consoleLogWithStyle(`Swipes realizados: ${swipeCount}/${MAX_SWIPES}`, "35");
       consoleLogWithStyle("Não Pelo erro 2", "31");
     }
 
     await rejectSuperLike(page);
   }
+  
+  consoleLogWithStyle(`Limite de ${MAX_SWIPES} swipes atingido. Encerrando...`, "33");
 }
 
 /**
@@ -163,18 +188,7 @@ async function singleInstaBioVerification(page) {
  * @param {object} page - Puppeteer page object.
  */
 async function openProfile(page) {
-  await page.evaluate(() => {
-    const buttons = Array.from(
-      document.querySelectorAll("button[type='button']")
-    );
-    const targetButton = buttons.find((button) => {
-      const hiddenSpan = button.querySelector("span.Hidden");
-      return hiddenSpan && hiddenSpan.textContent.includes("Abrir perfil");
-    });
-    if (targetButton) {
-      targetButton.click();
-    }
-  });
+  await page.keyboard.press("ArrowUp");
 }
 
 /**
@@ -206,7 +220,7 @@ async function isSelectorVisible(page, selector) {
     .catch(() => false);
 }
 
-async function matchPoints(tinderJson, page) {
+async function matchPoints(tinderJson, page, { likeCount, MAX_LIKES }) {
   tinderJson = tinderJson.replace("```json", "");
   tinderJson = tinderJson.replace("```", "");
   tinderJson = JSON.parse(tinderJson);
@@ -230,18 +244,49 @@ async function matchPoints(tinderJson, page) {
   console.log(`Total de pontos: ${totalPoints}`);
 
   if (totalPoints >= 14) {
-    await saveProfileScreenshot(page, "Yes/Tinder/Sup");
-    await randomScroll(page);
-    consoleLogWithStyle("Mega Match!", "34");
-    await decideLikeOrNope(page, "Sim");
+    // 60% de chance de like
+    const random = Math.random();
+    if (random < 0.6 && likeCount < MAX_LIKES) {
+      await saveProfileScreenshot(page, "Yes/Tinder/Sup");
+      await randomScroll(page);
+      consoleLogWithStyle("Mega Match! (60% like)", "34");
+      await decideLikeOrNope(page, "Sim");
+      return true;
+    } else {
+      if (likeCount >= MAX_LIKES) {
+        consoleLogWithStyle("Limite de likes atingido! Dando nope...", "33");
+      } else {
+        consoleLogWithStyle("Mega Match! (40% nope)", "31");
+      }
+      await saveProfileScreenshot(page, "Nopes/Tinder");
+      await decideLikeOrNope(page, "Não");
+      return false;
+    }
   } else if (totalPoints >= 8) {
-    await saveProfileScreenshot(page, "Yes/Tinder");
-    await randomScroll(page);
-    consoleLogWithStyle("Match", "32");
-    await decideLikeOrNope(page, "Sim");
+    // 40% de chance de like
+    const random = Math.random();
+    if (random < 0.4 && likeCount < MAX_LIKES) {
+      await saveProfileScreenshot(page, "Yes/Tinder");
+      await randomScroll(page);
+      consoleLogWithStyle("Match (40% like)", "32");
+      await decideLikeOrNope(page, "Sim");
+      return true;
+    } else {
+      if (likeCount >= MAX_LIKES) {
+        consoleLogWithStyle("Limite de likes atingido! Dando nope...", "33");
+      } else {
+        consoleLogWithStyle("Match (60% nope)", "31");
+      }
+      await saveProfileScreenshot(page, "Nopes/Tinder");
+      await decideLikeOrNope(page, "Não");
+      return false;
+    }
   } else {
+    // Sempre nope
     consoleLogWithStyle("Nope", "31");
+    await saveProfileScreenshot(page, "Nopes/Tinder");
     await decideLikeOrNope(page, "Não");
+    return false;
   }
 }
 
